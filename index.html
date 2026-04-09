@@ -9,7 +9,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            user-select: none; /* 避免移动端长按菜单，不影响体验 */
+            user-select: none; /* 避免移动端长按菜单 */
         }
         
         body {
@@ -21,7 +21,7 @@
             align-items: center;
             overflow: hidden;
             position: relative;
-            touch-action: pan-x pan-y; /* 保留手势滚动但按钮区域会阻止冒泡 */
+            touch-action: pan-x pan-y;
         }
         
         .container {
@@ -158,13 +158,11 @@
             box-shadow: 0 10px 25px rgba(233, 30, 99, 0.4);
         }
         
-        /* “再考虑考虑” 按钮基础样式，移动时由JS动态控制fixed + 位置 */
         .btn-no {
             background: #f5f5f5;
             color: #444;
             border: 1px solid #ffb6c1;
             transition: background 0.2s, box-shadow 0.2s, left 0.05s linear, top 0.05s linear;
-            /* 极短过渡让移动干脆利落不拖影，且不会消失 */
         }
         
         .btn-no:hover {
@@ -209,34 +207,22 @@
                 width: 92%;
                 padding: 24px 20px;
             }
-            
             h1 {
                 font-size: 1.8rem;
             }
-            
             .message {
                 font-size: 1rem;
             }
-            
             .button-container {
                 flex-direction: column;
                 align-items: center;
                 gap: 18px;
             }
-            
             .btn {
                 width: 85%;
                 padding: 12px 20px;
                 font-size: 1rem;
             }
-        }
-        
-        /* 防止fixed按钮在极端尺寸下闪烁 */
-        .btn-no-fixed {
-            position: fixed !important;
-            margin: 0 !important;
-            z-index: 1000;
-            transition: left 0.05s linear, top 0.05s linear; /* 极速移动无残影 */
         }
     </style>
 </head>
@@ -252,7 +238,7 @@
             <p>我真的意识到自己的问题了，你愿意接受我的道歉吗？</p> 
         </div>
         <div class="button-container">
-            <button class="btn btn-yes" id="yesBtn"> 我愿意 </button>
+            <button class="btn btn-yes" id="yesBtn"> 我愿意 💖</button>
             <button class="btn btn-no" id="noBtn">🤔 再考虑考虑</button>
         </div>
         <div class="response" id="response"></div>
@@ -262,11 +248,10 @@
         (function() {
             "use strict";
             
-            // ---------- 漂浮爱心（加强版）----------
+            // 漂浮爱心（加强移动端性能）
             function createHearts() {
                 const heartsContainer = document.getElementById('hearts');
                 if (!heartsContainer) return;
-                // 清除旧心，避免过多
                 const oldHearts = heartsContainer.querySelectorAll('.heart');
                 oldHearts.forEach(h => h.remove());
                 
@@ -286,18 +271,14 @@
                 }
             }
             
-            // 全局元素
             const yesBtn = document.getElementById('yesBtn');
             const noBtn = document.getElementById('noBtn');
             const responseDiv = document.getElementById('response');
             
-            // 逃跑按钮的固定状态标记
-            let isNoBtnFixed = false;
-            let isMoving = false;          // 防止并发移动
-            let pendingMoveTimer = null;
-            const EDGE_SAFE_DISTANCE = 16;   // 距离屏幕边缘最小距离(px) 确保完全可见
+            let isMoving = false;
+            const EDGE_SAFE_DISTANCE = 15;   // 距离屏幕边缘至少15px
             
-            // ---------- 辅助函数：获取精确视口尺寸（考虑任何滚动条，移动端安全）----------
+            // 获取最准确的视口尺寸（移动端避免地址栏影响，使用document.documentElement）
             function getViewportSize() {
                 return {
                     width: window.innerWidth,
@@ -305,10 +286,9 @@
                 };
             }
             
-            // ---------- 确保按钮永远不超出屏幕边界 (修正核心) ----------
-            function clampButtonToViewport() {
+            // 强制修正按钮位置，确保完整在视口内（核心修复）
+            function enforceButtonInViewport() {
                 if (!noBtn) return;
-                // 只有 fixed 定位的按钮需要边界修正，普通static不用管
                 if (noBtn.style.position !== 'fixed') return;
                 
                 const rect = noBtn.getBoundingClientRect();
@@ -316,101 +296,92 @@
                 const btnH = rect.height;
                 const { width: vw, height: vh } = getViewportSize();
                 
-                // 极端情况：如果按钮宽度或者高度大于视口，我们至少保证左上角不超出左/上边缘
+                // 边界计算（允许的最小/最大 left/top）
+                let minLeft = EDGE_SAFE_DISTANCE;
+                let maxLeft = vw - btnW - EDGE_SAFE_DISTANCE;
+                let minTop = EDGE_SAFE_DISTANCE;
+                let maxTop = vh - btnH - EDGE_SAFE_DISTANCE;
+                
+                // 极端情况：按钮宽度大于视口宽度时，至少保证左边缘不超出左边距
+                if (maxLeft < minLeft) {
+                    minLeft = 0;
+                    maxLeft = vw - btnW;
+                }
+                if (maxTop < minTop) {
+                    minTop = 0;
+                    maxTop = vh - btnH;
+                }
+                
                 let currentLeft = parseFloat(noBtn.style.left);
                 let currentTop = parseFloat(noBtn.style.top);
                 if (isNaN(currentLeft)) currentLeft = rect.left;
                 if (isNaN(currentTop)) currentTop = rect.top;
                 
-                // 计算合法区间 (保证整个按钮都在屏幕内部，不能消失)
-                const minX = EDGE_SAFE_DISTANCE;
-                const maxX = vw - btnW - EDGE_SAFE_DISTANCE;
-                const minY = EDGE_SAFE_DISTANCE;
-                const maxY = vh - btnH - EDGE_SAFE_DISTANCE;
+                let newLeft = Math.min(maxLeft, Math.max(minLeft, currentLeft));
+                let newTop = Math.min(maxTop, Math.max(minTop, currentTop));
                 
-                let newLeft = currentLeft;
-                let newTop = currentTop;
-                
-                // 当视口过小无法容纳完整按钮时，至少让按钮紧贴边缘但完整显示（缩小边距保证不溢出）
-                if (maxX < minX) {
-                    // 窗口太窄，按钮宽度几乎和屏幕一样，让左边缘贴近最小边距，右边缘会超出但至少不会消失
-                    newLeft = EDGE_SAFE_DISTANCE;
-                } else {
-                    newLeft = Math.min(maxX, Math.max(minX, currentLeft));
-                }
-                
-                if (maxY < minY) {
-                    newTop = EDGE_SAFE_DISTANCE;
-                } else {
-                    newTop = Math.min(maxY, Math.max(minY, currentTop));
-                }
-                
-                // 如果位置需要修正，直接应用
-                if (Math.abs(newLeft - currentLeft) > 0.5 || Math.abs(newTop - currentTop) > 0.5) {
+                // 如果超出边界则修正
+                if (newLeft !== currentLeft || newTop !== currentTop) {
                     noBtn.style.left = newLeft + 'px';
                     noBtn.style.top = newTop + 'px';
                 }
                 
-                // 二次保障：如果按钮依然有任何部分超出视口，强制重新设置到一个绝对安全的位置（左上安全区）
+                // 二次安全校验：如果按钮任何部分超出视口超过2px，强制放到安全区域中心
                 const afterRect = noBtn.getBoundingClientRect();
                 if (afterRect.right > vw + 2 || afterRect.left < -2 || afterRect.bottom > vh + 2 || afterRect.top < -2) {
-                    // 灾难恢复：放到屏幕中间偏右下的安全区域
-                    const fallbackX = Math.min(maxX, Math.max(minX, vw / 2 - btnW / 2));
-                    const fallbackY = Math.min(maxY, Math.max(minY, vh / 2 - btnH / 2));
-                    noBtn.style.left = (isNaN(fallbackX) ? EDGE_SAFE_DISTANCE : fallbackX) + 'px';
-                    noBtn.style.top = (isNaN(fallbackY) ? EDGE_SAFE_DISTANCE : fallbackY) + 'px';
+                    const safeX = Math.min(maxLeft, Math.max(minLeft, vw/2 - btnW/2));
+                    const safeY = Math.min(maxTop, Math.max(minTop, vh/2 - btnH/2));
+                    noBtn.style.left = safeX + 'px';
+                    noBtn.style.top = safeY + 'px';
                 }
             }
             
-            // ---------- 将按钮转为 fixed 并初始化安全位置（第一次逃跑时）----------
-            function ensureNoBtnFixed() {
-                if (yesBtn.disabled) return false;   // 已经原谅了，无需移动
-                if (noBtn.style.position === 'fixed') return true;
+            // 将按钮转为fixed定位，并保证初始位置安全
+            function ensureFixedAndSafe() {
+                if (yesBtn.disabled) return false;
+                if (noBtn.style.position === 'fixed') {
+                    enforceButtonInViewport();
+                    return true;
+                }
                 
-                // 获取当前相对于视口的位置
                 const rect = noBtn.getBoundingClientRect();
                 const btnW = rect.width;
                 const btnH = rect.height;
                 const { width: vw, height: vh } = getViewportSize();
                 
-                // 设定最小边距
-                const minX = EDGE_SAFE_DISTANCE;
-                const maxX = vw - btnW - EDGE_SAFE_DISTANCE;
-                const minY = EDGE_SAFE_DISTANCE;
-                const maxY = vh - btnH - EDGE_SAFE_DISTANCE;
+                let minLeft = EDGE_SAFE_DISTANCE;
+                let maxLeft = vw - btnW - EDGE_SAFE_DISTANCE;
+                let minTop = EDGE_SAFE_DISTANCE;
+                let maxTop = vh - btnH - EDGE_SAFE_DISTANCE;
                 
-                let startX = rect.left;
-                let startY = rect.top;
-                // 确保初始位置在边界内
-                if (maxX < minX) {
-                    startX = EDGE_SAFE_DISTANCE;
-                } else {
-                    startX = Math.min(maxX, Math.max(minX, startX));
+                if (maxLeft < minLeft) {
+                    minLeft = 0;
+                    maxLeft = vw - btnW;
                 }
-                if (maxY < minY) {
-                    startY = EDGE_SAFE_DISTANCE;
-                } else {
-                    startY = Math.min(maxY, Math.max(minY, startY));
+                if (maxTop < minTop) {
+                    minTop = 0;
+                    maxTop = vh - btnH;
                 }
+                
+                let startX = Math.min(maxLeft, Math.max(minLeft, rect.left));
+                let startY = Math.min(maxTop, Math.max(minTop, rect.top));
                 
                 noBtn.style.position = 'fixed';
                 noBtn.style.left = startX + 'px';
                 noBtn.style.top = startY + 'px';
                 noBtn.style.width = rect.width + 'px';
                 noBtn.style.zIndex = '9999';
-                noBtn.style.transition = 'left 0.05s linear, top 0.05s linear'; // 极快移动，无残影
-                isNoBtnFixed = true;
+                noBtn.style.transition = 'left 0.08s linear, top 0.08s linear';
                 return true;
             }
             
-            // ---------- 智能移动：确保新位置既在边界内，又尽量避开鼠标/手指，永不超出屏幕 ----------
-            function moveButtonToRandomSafePosition(mouseX, mouseY) {
+            // 移动按钮到安全随机位置，避开触摸点（鼠标/手指）
+            function moveToRandomSafePosition(touchX, touchY) {
                 if (isMoving) return false;
                 if (yesBtn.disabled) return false;
                 
-                // 确保 fixed 模式
-                const isFixedReady = ensureNoBtnFixed();
-                if (!isFixedReady && yesBtn.disabled) return false;
+                const ready = ensureFixedAndSafe();
+                if (!ready) return false;
                 
                 isMoving = true;
                 
@@ -420,35 +391,36 @@
                     const btnH = rect.height;
                     const { width: vw, height: vh } = getViewportSize();
                     
-                    // 动态边界（保证完全可见，不留死角）
-                    const minX = EDGE_SAFE_DISTANCE;
-                    const maxX = vw - btnW - EDGE_SAFE_DISTANCE;
-                    const minY = EDGE_SAFE_DISTANCE;
-                    const maxY = vh - btnH - EDGE_SAFE_DISTANCE;
+                    let minX = EDGE_SAFE_DISTANCE;
+                    let maxX = vw - btnW - EDGE_SAFE_DISTANCE;
+                    let minY = EDGE_SAFE_DISTANCE;
+                    let maxY = vh - btnH - EDGE_SAFE_DISTANCE;
                     
-                    // 极端情况防御：如果视口实在放不下按钮（超小屏），则不移动但确保不消失，直接修正
-                    if (maxX < minX || maxY < minY) {
-                        // 无法安全移动，强行固定到边缘即可
-                        clampButtonToViewport();
+                    // 边界容错（极端小屏幕）
+                    if (maxX < minX) { minX = 0; maxX = vw - btnW; }
+                    if (maxY < minY) { minY = 0; maxY = vh - btnH; }
+                    
+                    // 如果可移动范围过小，直接强制修正后返回
+                    if (maxX - minX < 5 || maxY - minY < 5) {
+                        enforceButtonInViewport();
                         isMoving = false;
                         return false;
                     }
                     
-                    // 最多尝试15次找到一个不遮盖鼠标的位置
                     let attempts = 0;
-                    const MAX_ATTEMPTS = 18;
+                    const MAX_ATTEMPTS = 20;
                     let newLeft = null, newTop = null;
                     
                     while (attempts < MAX_ATTEMPTS) {
                         const randX = minX + Math.random() * (maxX - minX);
                         const randY = minY + Math.random() * (maxY - minY);
                         
-                        // 检查鼠标（或触摸点）是否在这个候选区域内
-                        const isOverMouse = (mouseX !== undefined && mouseX !== null) && 
-                                            (mouseX >= randX && mouseX <= randX + btnW && 
-                                             mouseY >= randY && mouseY <= randY + btnH);
+                        // 检查触摸点是否落在候选区域内
+                        const touchInside = (touchX !== undefined && touchX !== null) &&
+                                            (touchX >= randX && touchX <= randX + btnW &&
+                                             touchY >= randY && touchY <= randY + btnH);
                         
-                        if (!isOverMouse) {
+                        if (!touchInside) {
                             newLeft = randX;
                             newTop = randY;
                             break;
@@ -456,202 +428,148 @@
                         attempts++;
                     }
                     
-                    // 如果没找到理想位置，至少保证随机位置（可能会在鼠标下，但至少不超出）
                     if (newLeft === null) {
                         newLeft = minX + Math.random() * (maxX - minX);
                         newTop = minY + Math.random() * (maxY - minY);
                     }
                     
-                    // 二次边界保险（浮点数取整避免漂移）
+                    // 最终边界裁剪
                     newLeft = Math.min(maxX, Math.max(minX, newLeft));
                     newTop = Math.min(maxY, Math.max(minY, newTop));
                     
-                    // 应用新位置
                     noBtn.style.left = newLeft + 'px';
                     noBtn.style.top = newTop + 'px';
                     
-                    // 再次确认按钮在视口内（异步延迟确保DOM更新后检查）
+                    // 立即再次检查边界（防止怪异偏移）
                     requestAnimationFrame(() => {
-                        if (!yesBtn.disabled) {
-                            clampButtonToViewport();
-                        }
+                        enforceButtonInViewport();
                         isMoving = false;
                     });
                     
                     return true;
                 } catch (err) {
-                    console.warn("move error", err);
-                    clampButtonToViewport();
+                    console.warn(err);
+                    enforceButtonInViewport();
                     isMoving = false;
                     return false;
                 }
             }
             
-            // ---------- 鼠标/触摸触发逃跑 (优雅处理事件) ----------
-            function handleEscapeTrigger(clientX, clientY) {
+            // 处理触摸或鼠标进入
+            function handleEscape(clientX, clientY) {
                 if (yesBtn.disabled) return;
                 if (isMoving) return;
-                
-                // 确保fixed状态
-                ensureNoBtnFixed();
-                
-                // 关键: 直接基于传入的鼠标/触摸坐标进行移动
-                moveButtonToRandomSafePosition(clientX, clientY);
+                ensureFixedAndSafe();
+                moveToRandomSafePosition(clientX, clientY);
             }
             
-            // ---------- 鼠标进入 或 触摸开始 触发逃跑 ----------
-            function onNoBtnMouseEnter(e) {
+            // PC鼠标进入
+            function onMouseEnter(e) {
                 if (yesBtn.disabled) return;
                 e.preventDefault();
-                let clientX, clientY;
-                if (e.touches) {
-                    // 触摸事件
-                    const touch = e.touches[0];
-                    if (touch) {
-                        clientX = touch.clientX;
-                        clientY = touch.clientY;
-                    } else return;
-                } else {
-                    clientX = e.clientX;
-                    clientY = e.clientY;
-                }
-                if (clientX !== undefined && clientY !== undefined) {
-                    handleEscapeTrigger(clientX, clientY);
-                }
+                handleEscape(e.clientX, e.clientY);
             }
             
-            // 对于移动端，额外监听 touchstart 并阻止冒泡防止页面滚动时误触
-            function onNoBtnTouchStart(e) {
+            // 移动端触摸开始
+            function onTouchStart(e) {
                 if (yesBtn.disabled) return;
-                e.preventDefault();      // 防止页面滚动，让按钮逃跑更灵敏
+                e.preventDefault();  // 阻止滚动，让逃跑更跟手
                 const touch = e.touches[0];
                 if (touch) {
-                    handleEscapeTrigger(touch.clientX, touch.clientY);
+                    handleEscape(touch.clientX, touch.clientY);
                 }
             }
             
-            // 窗口resize时确保按钮永不离界
-            function onWindowResize() {
-                if (yesBtn.disabled) return;
-                if (noBtn.style.position === 'fixed') {
-                    clampButtonToViewport();
-                    // 额外检查按钮是否因为视口变化而“消失”，确保可见
-                    requestAnimationFrame(() => {
-                        const rect = noBtn.getBoundingClientRect();
-                        const { width: vw, height: vh } = getViewportSize();
-                        if (rect.right < 5 || rect.left > vw - 5 || rect.bottom < 5 || rect.top > vh - 5) {
-                            // 消失了！立刻重置到安全坐标
-                            const btnW = rect.width;
-                            const btnH = rect.height;
-                            const minX = EDGE_SAFE_DISTANCE;
-                            const maxX = vw - btnW - EDGE_SAFE_DISTANCE;
-                            const minY = EDGE_SAFE_DISTANCE;
-                            const maxY = vh - btnH - EDGE_SAFE_DISTANCE;
-                            let fallbackX = minX;
-                            let fallbackY = minY;
-                            if (maxX > minX) fallbackX = minX + (maxX - minX) / 2;
-                            if (maxY > minY) fallbackY = minY + (maxY - minY) / 2;
-                            noBtn.style.left = fallbackX + 'px';
-                            noBtn.style.top = fallbackY + 'px';
-                        }
-                    });
-                }
-            }
-            
-            // ---------- 点击“再考虑考虑” 时显示可爱反馈，但不消失并且继续逃跑（不禁用按钮）----------
+            // 点击“再考虑考虑”时显示反馈并再次逃跑（确保移动端不会消失）
             function onNoBtnClick(e) {
                 if (yesBtn.disabled) return;
                 e.stopPropagation();
-                // 温柔的文字反馈，让道歉更有爱
-                responseDiv.textContent = '好吧...我理解你的感受，我会继续努力！';
+                responseDiv.textContent = '🌷 我会耐心等你，再给我一次机会好不好～ 🌷';
                 responseDiv.className = 'response show';
                 setTimeout(() => {
                     if (responseDiv.className.includes('show') && !yesBtn.disabled) {
-                        // 三秒后淡去，但不要覆盖接受消息
                         if (responseDiv.textContent.includes('耐心等你')) {
                             responseDiv.classList.remove('show');
                         }
                     }
                 }, 2200);
                 
-                // 即使点击了，也让它再逃跑一次，保持调皮但是不会消失
                 if (!isMoving) {
-                    // 获取当前鼠标位置，如果没有真实鼠标事件则根据按钮中心偏移模拟？
-                    // 让按钮再随机逃跑一次增加趣味
                     const rect = noBtn.getBoundingClientRect();
-                    const fakeX = rect.left + rect.width / 2;
-                    const fakeY = rect.top + rect.height / 2;
-                    handleEscapeTrigger(fakeX, fakeY);
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    handleEscape(centerX, centerY);
                 }
             }
             
-            // ---------- 愿意接受道歉的逻辑 ----------
+            // 愿意按钮逻辑
             function onYesClick() {
                 if (yesBtn.disabled) return;
-                
-                responseDiv.textContent = '太好了！让我们开一场三角洲吧！';
+                responseDiv.textContent = '太好了！让我们开一场三角洲吧！💕';
                 responseDiv.className = 'response show';
-                
-                // 额外生成爱心雨
                 createHearts();
-                for(let i = 0; i < 8; i++) {
-                    setTimeout(() => createHearts(), i * 200);
+                for(let i = 0; i < 6; i++) {
+                    setTimeout(() => createHearts(), i * 150);
                 }
-                
-                // 禁用两个按钮，不再逃跑
                 yesBtn.disabled = true;
                 noBtn.disabled = true;
-                
-                // 将“再考虑考虑”按钮变灰且静止，不再响应任何事件
                 noBtn.style.pointerEvents = 'none';
-                noBtn.style.opacity = '0.7';
-                noBtn.style.transition = 'opacity 0.3s';
-                // 可选：把按钮变柔和
+                noBtn.style.opacity = '0.6';
                 noBtn.style.filter = 'grayscale(0.1)';
-                
-                // 确保回应不会消失
-                setTimeout(() => {
-                    // 保持回应内容
-                }, 100);
             }
             
-            // ---------- 初始化事件监听与保险 ----------
+            // 窗口尺寸变化时，强力修正按钮位置（移动端旋转屏幕尤其重要）
+            function onResize() {
+                if (yesBtn.disabled) return;
+                if (noBtn.style.position === 'fixed') {
+                    enforceButtonInViewport();
+                } else {
+                    // 如果还没变成fixed，但是窗口变化后，确保不会超出原容器（但一般无影响）
+                }
+                // 额外保险：重新生成爱心适应新尺寸
+                createHearts();
+            }
+            
+            // 滚动保险（极少情况，但加上）
+            function onScroll() {
+                if (noBtn.style.position === 'fixed' && !yesBtn.disabled) {
+                    enforceButtonInViewport();
+                }
+            }
+            
+            // 定期巡检（移动端每1.2秒检查一次，确保永不消失）
+            let intervalId = null;
+            function startSafetyCheck() {
+                if (intervalId) clearInterval(intervalId);
+                intervalId = setInterval(() => {
+                    if (!yesBtn.disabled && noBtn.style.position === 'fixed') {
+                        enforceButtonInViewport();
+                    }
+                }, 1200);
+            }
+            
             function init() {
                 createHearts();
                 
-                // 逃跑核心: mouseenter (pc) + touchstart (移动端)
-                noBtn.addEventListener('mouseenter', onNoBtnMouseEnter);
-                noBtn.addEventListener('touchstart', onNoBtnTouchStart, { passive: false });
-                // 点击也轻微逃跑+反馈
+                // 事件绑定
+                noBtn.addEventListener('mouseenter', onMouseEnter);
+                noBtn.addEventListener('touchstart', onTouchStart, { passive: false });
                 noBtn.addEventListener('click', onNoBtnClick);
-                
-                // yes 按钮
                 yesBtn.addEventListener('click', onYesClick);
                 
-                // 全局resize保险（保证按钮永远不消失）
-                window.addEventListener('resize', onWindowResize);
+                window.addEventListener('resize', onResize);
                 window.addEventListener('orientationchange', () => {
-                    setTimeout(onWindowResize, 30);
+                    setTimeout(onResize, 50);
                 });
+                window.addEventListener('scroll', onScroll);
                 
-                // 滚动保险（如果有滚动，确保fixed按钮不偏）
-                window.addEventListener('scroll', () => {
-                    if (noBtn.style.position === 'fixed' && !yesBtn.disabled) {
-                        clampButtonToViewport();
-                    }
-                });
+                // 启动安全巡检
+                startSafetyCheck();
                 
-                // 初次也执行一次边界清理
+                // 初始确保按钮安全（如果已经fixed？不会，但以防万一）
                 setTimeout(() => {
-                    if (noBtn.style.position === 'fixed') clampButtonToViewport();
+                    if (noBtn.style.position === 'fixed') enforceButtonInViewport();
                 }, 100);
-                
-                // 动态监听按钮尺寸变化（比如字体缩放），每2秒做一次温和保险（不影响性能）
-                setInterval(() => {
-                    if (!yesBtn.disabled && noBtn.style.position === 'fixed') {
-                        clampButtonToViewport();
-                    }
-                }, 1500);
             }
             
             init();
