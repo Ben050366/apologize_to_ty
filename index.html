@@ -1,0 +1,524 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>To ty · 真心道歉</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .container {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            animation: fadeIn 1.5s ease-in-out;
+            z-index: 5;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        h1 {
+            color: #e91e63;
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .message {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 40px;
+            animation: slideIn 2s ease-in-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .hearts {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .heart {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: #e91e63;
+            transform: rotate(45deg);
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .heart::before,
+        .heart::after {
+            content: '';
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-color: #e91e63;
+            border-radius: 50%;
+        }
+        
+        .heart::before {
+            top: -25px;
+            left: 0;
+        }
+        
+        .heart::after {
+            top: 0;
+            left: -25px;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: rotate(45deg) translateY(0) scale(0.8);
+                opacity: 0.7;
+            }
+            50% {
+                transform: rotate(45deg) translateY(-20px) scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 40px;
+            position: relative;
+            /* 不再限制按钮的绝对定位上下文，让noBtn可以自由移动 */
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            /* 注意：noBtn移动时会动态覆盖transition，保证逃跑无延迟 */
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s;
+            will-change: transform;
+        }
+        
+        .btn-yes {
+            background: linear-gradient(45deg, #e91e63, #9c27b0);
+            color: white;
+        }
+        
+        .btn-yes:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(233, 30, 99, 0.4);
+        }
+        
+        .btn-no {
+            background: #f1f1f1;
+            color: #333;
+            position: relative;
+            /* 初始不设置fixed，由js动态处理 */
+            z-index: 100;
+            /* 去除默认transition避免逃跑拖沓 —— 但保留背景变化 */
+            transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+        }
+        
+        /* 当按钮变为fixed后，hover效果依然保留 */
+        .btn-no:hover {
+            background: #e0e0e0;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* yes按钮禁用样式 */
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: default;
+            transform: none !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .response {
+            margin-top: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #e91e63;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            min-height: 3.5rem;
+        }
+        
+        .response.show {
+            opacity: 1;
+            animation: bounce 1s ease-in-out;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-20px); }
+            60% { transform: translateY(-10px); }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .message {
+                font-size: 1rem;
+            }
+            
+            .button-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .btn {
+                width: 80%;
+                margin-bottom: 0;
+                padding: 14px 20px;
+            }
+            
+            /* 移动端no按钮同样可以逃跑，fixed依然有效 */
+        }
+    </style>
+</head>
+<body>
+    <div class="hearts" id="hearts"></div>
+    <div class="container">
+        <h1>我想跟你说声抱歉</h1>
+        <div class="message">
+            <p>我反思了很久，知道自己这次做了很多让你不开心的事，想认认真真跟你道歉。</p>
+            <p>接你时明明知道你东西很多、又累又辛苦，本该打车送你，却没有做到。</p>
+            <p>送你们坐地铁的路上，还喋喋不休地跟你闺蜜说话，完全没顾及到你的心情。</p>
+            <p>那天我状态不好，说了些矛盾的话，前后不一。</p>
+            <p>我真的意识到自己的问题了，你愿意接受我的道歉吗？</p> 
+        </div>
+        <div class="button-container">
+            <button class="btn btn-yes" id="yesBtn">我愿意 💖</button>
+            <button class="btn btn-no" id="noBtn">再考虑考虑</button>
+        </div>
+        <div class="response" id="response"></div>
+    </div>
+    
+    <script>
+        (function() {
+            "use strict";
+            
+            // 创建漂浮的心形 (保持不变)
+            function createHearts() {
+                const heartsContainer = document.getElementById('hearts');
+                const colors = ['#e91e63', '#f48fb1', '#ce93d8', '#ba68c8'];
+                
+                for (let i = 0; i < 15; i++) {
+                    const heart = document.createElement('div');
+                    heart.className = 'heart';
+                    heart.style.left = Math.random() * 100 + '%';
+                    heart.style.top = Math.random() * 100 + '%';
+                    heart.style.animationDelay = Math.random() * 6 + 's';
+                    heart.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                    heart.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    heart.style.opacity = Math.random() * 0.5 + 0.3;
+                    heart.style.transform = 'rotate(45deg) scale(' + (Math.random() * 0.5 + 0.5) + ')';
+                    heartsContainer.appendChild(heart);
+                }
+            }
+            
+            // 初始化
+            document.addEventListener('DOMContentLoaded', function() {
+                createHearts();
+                
+                const yesBtn = document.getElementById('yesBtn');
+                const noBtn = document.getElementById('noBtn');
+                const response = document.getElementById('response');
+                
+                // ---------- 修复重点：noBtn 完美逃跑，不超出屏幕，无卡顿 ----------
+                let isMoving = false;           // 防止递归/重叠移动
+                let moveAttempts = 0;
+                const MAX_MOVE_ATTEMPTS = 8;     // 最多尝试次数，避免死循环
+                const MARGIN = 20;               // 距离屏幕边缘的安全距离(px)，适当调大避免hover时溢出
+                
+                // 获取鼠标当前位置 (基于视口)
+                function getMouseCoordinates(event) {
+                    return {
+                        x: event.clientX,
+                        y: event.clientY
+                    };
+                }
+                
+                // 检查某个坐标是否在按钮元素内
+                function isPointInsideElement(x, y, element) {
+                    const rect = element.getBoundingClientRect();
+                    return (
+                        x >= rect.left &&
+                        x <= rect.right &&
+                        y >= rect.top &&
+                        y <= rect.bottom
+                    );
+                }
+                
+                // 核心移动函数：将按钮移动到随机位置 (保证在视口内，并尽量避开鼠标)
+                function moveButtonAway(event) {
+                    if (isMoving) return;
+                    if (yesBtn.disabled) return;  // 已经接受道歉，不再逃跑
+                    
+                    isMoving = true;
+                    moveAttempts = 0;
+                    
+                    // 获取鼠标坐标
+                    const mouse = getMouseCoordinates(event);
+                    
+                    // 确保按钮使用 fixed 定位 (脱离文档流，可全屏移动)
+                    if (noBtn.style.position !== 'fixed') {
+                        // 首次移动：记录原始尺寸，转为fixed
+                        noBtn.style.position = 'fixed';
+                        // 为了保证转换时不跳动，先获取当前视口位置
+                        const initialRect = noBtn.getBoundingClientRect();
+                        noBtn.style.left = initialRect.left + 'px';
+                        noBtn.style.top = initialRect.top + 'px';
+                        // 固定宽度，避免因为fixed后宽度变化（但按钮本身宽度由内容决定，一般不变）
+                        noBtn.style.width = initialRect.width + 'px';
+                        // 提高层级
+                        noBtn.style.zIndex = '999';
+                        // 移除可能影响移动的过渡效果 —— 关键！解决“移动慢/卡顿”
+                        noBtn.style.transition = 'none';
+                    }
+                    
+                    // 获取视口尺寸：兼容所有浏览器，使用clientWidth避免滚动条影响
+                    const vw = document.documentElement.clientWidth || document.body.clientWidth;
+                    const vh = document.documentElement.clientHeight || document.body.clientHeight;
+                    
+                    // 获取按钮当前尺寸 (fixed后尺寸稳定)
+                    const btnRect = noBtn.getBoundingClientRect();
+                    const btnWidth = btnRect.width;
+                    const btnHeight = btnRect.height;
+                    
+                    // 可移动的最大边界 (确保按钮完全在屏幕内)
+                    const maxLeft = vw - btnWidth - MARGIN;
+                    const maxTop = vh - btnHeight - MARGIN;
+                    const minLeft = MARGIN;
+                    const minTop = MARGIN;
+                    
+                    // 如果视口太小，无法容纳按钮，就不移动 (极少情况)
+                    if (maxLeft < minLeft || maxTop < minTop) {
+                        isMoving = false;
+                        return;
+                    }
+                    
+                    // 递归尝试：找到一个位置既在边界内，又不在鼠标下方
+                    function tryFindPosition() {
+                        if (moveAttempts >= MAX_MOVE_ATTEMPTS) {
+                            // 实在避不开，就随机放一个合法位置（认命），强制边界检查
+                            const finalX = Math.max(minLeft, Math.min(maxLeft, 
+                                minLeft + Math.random() * (maxLeft - minLeft)));
+                            const finalY = Math.max(minTop, Math.min(maxTop, 
+                                minTop + Math.random() * (maxTop - minTop)));
+                            noBtn.style.left = finalX + 'px';
+                            noBtn.style.top = finalY + 'px';
+                            isMoving = false;
+                            return;
+                        }
+                        
+                        moveAttempts++;
+                        
+                        // 生成随机位置 (边界内)
+                        const randX = minLeft + Math.random() * (maxLeft - minLeft);
+                        const randY = minTop + Math.random() * (maxTop - minTop);
+                        
+                        // 临时应用位置 (但还没渲染，我们需要模拟检测)
+                        // 为了检测鼠标是否在“新位置”内，构造一个虚拟rect
+                        const virtualRect = {
+                            left: randX,
+                            right: randX + btnWidth,
+                            top: randY,
+                            bottom: randY + btnHeight
+                        };
+                        
+                        // 检查鼠标是否在这个虚拟区域内
+                        const mouseInside = (
+                            mouse.x >= virtualRect.left &&
+                            mouse.x <= virtualRect.right &&
+                            mouse.y >= virtualRect.top &&
+                            mouse.y <= virtualRect.bottom
+                        );
+                        
+                        if (!mouseInside) {
+                            // 好位置！应用，双重边界检查确保绝对不溢出
+                            const safeX = Math.max(minLeft, Math.min(maxLeft, randX));
+                            const safeY = Math.max(minTop, Math.min(maxTop, randY));
+                            noBtn.style.left = safeX + 'px';
+                            noBtn.style.top = safeY + 'px';
+                            isMoving = false;
+                            
+                            // 额外安全：如果移动后鼠标由于惯性还在按钮上（极小概率，但再检查一次）
+                            // 使用实际渲染后的位置再判断一次，如果还在则再移动一次（但避免无限）
+                            setTimeout(() => {
+                                // 微延迟确保渲染完成
+                                const currentRect = noBtn.getBoundingClientRect();
+                                if (isPointInsideElement(mouse.x, mouse.y, noBtn)) {
+                                    // 仍然在鼠标下，再触发一次移动 (但需要避免死循环)
+                                    if (!isMoving && !yesBtn.disabled) {
+                                        // 手动构造一个伪事件对象
+                                        const fakeEvent = { clientX: mouse.x, clientY: mouse.y };
+                                        moveButtonAway(fakeEvent);
+                                    }
+                                }
+                            }, 20);
+                            
+                        } else {
+                            // 鼠标还在新位置内，继续尝试
+                            tryFindPosition();
+                        }
+                    }
+                    
+                    tryFindPosition();
+                }
+                
+                // 防抖 + 确保移动流畅：使用 requestAnimationFrame 节流，避免过度触发
+                let pendingMove = false;
+                function handleNoBtnInteraction(e) {
+                    // 阻止默认和冒泡？不需要
+                    if (yesBtn.disabled) return;
+                    
+                    // 防止在移动过程中重复触发
+                    if (pendingMove) return;
+                    pendingMove = true;
+                    
+                    // 使用 RAF 保证在下一帧执行，避免卡顿和多次计算
+                    requestAnimationFrame(() => {
+                        // 再次检查是否已被禁用
+                        if (!yesBtn.disabled) {
+                            moveButtonAway(e);
+                        }
+                        pendingMove = false;
+                    });
+                }
+                
+                // 监听 mouseenter (比mouseover更合适，只在进入时触发，减少不必要调用)
+                noBtn.addEventListener('mouseenter', function(e) {
+                    // 如果已经fixed并且不在移动状态，直接移动
+                    handleNoBtnInteraction(e);
+                });
+                
+                // 触摸屏适配：手指触摸时也逃跑 (touchstart)
+                noBtn.addEventListener('touchstart', function(e) {
+                    e.preventDefault();  // 防止滚动或产生click
+                    if (yesBtn.disabled) return;
+                    // 获取第一个触摸点坐标
+                    const touch = e.touches[0];
+                    if (touch) {
+                        const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY };
+                        handleNoBtnInteraction(fakeEvent);
+                    }
+                }, { passive: false });
+                
+                // 对于click事件，如果点到了（极难），仍然显示回应。但我们要防止移动端双击误触
+                noBtn.addEventListener('click', function(e) {
+                    if (yesBtn.disabled) return;
+                    
+                    // 显示温柔的回应
+                    response.textContent = '没关系，我理解你！';
+                    response.className = 'response show';
+                    
+                    // 再让它跳一下（可选）
+                    // 但不再禁用按钮，允许继续逃跑（有趣）
+                });
+                
+                // 窗口大小改变时，确保按钮不超出屏幕 (如果已fixed)
+                window.addEventListener('resize', function() {
+                    if (noBtn.style.position === 'fixed' && !yesBtn.disabled) {
+                        const rect = noBtn.getBoundingClientRect();
+                        // 同样使用兼容的视口尺寸
+                        const vw = document.documentElement.clientWidth || document.body.clientWidth;
+                        const vh = document.documentElement.clientHeight || document.body.clientHeight;
+                        const btnW = rect.width;
+                        const btnH = rect.height;
+                        
+                        let newLeft = parseFloat(noBtn.style.left);
+                        let newTop = parseFloat(noBtn.style.top);
+                        
+                        // 边界修正
+                        const maxLeft = vw - btnW - MARGIN;
+                        const maxTop = vh - btnH - MARGIN;
+                        
+                        // 强制修正到安全范围内
+                        newLeft = Math.max(MARGIN, Math.min(maxLeft, newLeft));
+                        newTop = Math.max(MARGIN, Math.min(maxTop, newTop));
+                        
+                        noBtn.style.left = newLeft + 'px';
+                        noBtn.style.top = newTop + 'px';
+                    }
+                });
+                
+                // ---------- “我愿意”按钮逻辑 ----------
+                yesBtn.addEventListener('click', function() {
+                    response.textContent = '太好了！让我们开一场三角洲吧！💕';
+                    response.className = 'response show';
+                    
+                    // 增加更多的心形
+                    createHearts();
+                    
+                    // 禁用按钮
+                    yesBtn.disabled = true;
+                    noBtn.disabled = true;   // 不再逃跑
+                    
+                    // 让noBtn样式稍微变化，表示不可用
+                    noBtn.style.opacity = '0.6';
+                    noBtn.style.cursor = 'default';
+                    noBtn.style.pointerEvents = 'none';  // 禁止交互
+                    
+                    // 可选：把noBtn放回原位？不需要，保留fixed也可以
+                });
+                
+                // 如果noBtn被禁用后，取消事件监听? 不需要，因为disabled状态已经阻止了逻辑。
+                // 但为了防止意外，在move函数开头已经判断yesBtn.disabled
+                
+                // 初始化完成
+            });
+        })();
+    </script>
+</body>
+</html>
